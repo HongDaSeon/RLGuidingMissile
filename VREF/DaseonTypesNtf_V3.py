@@ -138,7 +138,6 @@ class Vector3:
     def direction(self):
         return Vector3.cast(self.vec / np.sqrt(sum(self.vec**2)))
 
-
 class Integrator:
     def __init__(self, IC, dt):
         self.IC             = IC
