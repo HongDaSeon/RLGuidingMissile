@@ -360,11 +360,9 @@ class lineEQN:
         return Vector3(result[0,0], result[1,0], 0)
 
     def Is_inMyRange(self, intersec):
-        pntLar      = Vector3(np.min(self.pnt1.x, self.pnt2.x),np.min(self.pnt1.y, self.pnt2.y),0)
-        pntSml      = Vector3(np.max(self.pnt1.x, self.pnt2.x),np.max(self.pnt1.y, self.pnt2.y),0)
+        pntLar      = Vector3(min(self.pnt1.x, self.pnt2.x),min(self.pnt1.y, self.pnt2.y),0)
+        pntSml      = Vector3(max(self.pnt1.x, self.pnt2.x),max(self.pnt1.y, self.pnt2.y),0)
         is_x_in     = ( (pntSml.x <= intersec.x) & (intersec.x <= pntLar.x) )
         is_y_in     = ( (pntSml.y <= intersec.y) & (intersec.y <= pntLar.y) )
         return is_x_in & is_y_in
-
-
 
