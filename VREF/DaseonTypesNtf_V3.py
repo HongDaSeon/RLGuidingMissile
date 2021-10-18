@@ -341,3 +341,30 @@ class DCM6DOF:
     def __repr__(self):
         return self.MAT
 
+class lineEQN:
+    def __init__(self, pnt1, pnt2):
+        self.pnt1       = pnt1
+        self.pnt2       = pnt2
+        self.slope      = (pnt2-pnt1).y / (pnt2-pnt1).x
+        self.x1         = pnt1.x
+        self.y1         = pnt1.y
+        self.inRange    = 0
+    
+    def FindIntersection(self, you):
+        try:
+            MAT         = np.array([ [self.slope, -1], [you.slope, -1] ])
+            behindEqual = np.array([[-self.y1+self.slope*self.x1],[-you.y1+you.slope*you.x1]])
+            result      = np.linalg.inv(MAT) @ behindEqual
+        except:
+            result = np.array([[9999999.], [9999999.]])
+        return Vector3(result[0,0], result[1,0], 0)
+
+    def Is_inMyRange(self, intersec):
+        pntLar      = Vector3(np.min(self.pnt1.x, self.pnt2.x),np.min(self.pnt1.y, self.pnt2.y),0)
+        pntSml      = Vector3(np.max(self.pnt1.x, self.pnt2.x),np.max(self.pnt1.y, self.pnt2.y),0)
+        is_x_in     = ( (pntSml.x <= intersec.x) & (intersec.x <= pntLar.x) )
+        is_y_in     = ( (pntSml.y <= intersec.y) & (intersec.y <= pntLar.y) )
+        return is_x_in & is_y_in
+
+
+
