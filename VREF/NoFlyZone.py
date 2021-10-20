@@ -9,19 +9,19 @@ import random as rd
 
 class NFZ:
 
-    def __init__(self, sizeRange, TargetPos, MissileMargin):
+    def __init__(self, sizeRange, TargetPos, Margin):
         self.radius = sizeRange[0] + rd.random()*(sizeRange[1]-sizeRange[0])
         targetDist  = TargetPos.mag
         defined     = False
-        while(not defined)
+        while(not defined):
             DircCandi           = 2*m.pi*rd.random()
             DistCandi           = targetDist*rd.random()
-            posCandi            = Vector3(DistCandi*m.cos(DircCandi), DistCandi*m.sin(DircDistCandi), 0)
+            posCandi            = Vector3(DistCandi*m.cos(DircCandi), DistCandi*m.sin(DircCandi), 0)
 
-            targetwiseDefined   = ( (TargetPos - posCandi).mag ) > (self.radius)
-            missilewiseDefined  = ( (TargetPos - Vector3(0,0,0)).mag ) > MissileMargin
+            targetwiseDefined   = ( (TargetPos - posCandi).mag ) > (Margin + self.radius)
+            missilewiseDefined  = ( (posCandi - Vector3(0,0,0)).mag ) > (Margin + self.radius)
 
-            defined             = targetMinMaxString & missilewiseDefined
+            defined             = targetwiseDefined & missilewiseDefined
 
         self.pos    = posCandi
 

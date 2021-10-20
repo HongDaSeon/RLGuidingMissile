@@ -30,9 +30,9 @@
 #   Input  : Complex coordinate of projected Look-angle
 #   Output : desired angular velocity in body coordinate itself
 
-import DaseonTypesNtf as Daseon
+import DaseonTypesNtf_V3 as Daseon
 from pyquaternion import Quaternion
-from DaseonTypesNtf import Vector3, DCM6DOF
+from DaseonTypesNtf_V3 import Vector3, DCM6DOF
 import math as m
 import numpy as np
 import torch
@@ -45,7 +45,7 @@ import pdb
 
 #Missile coordinate trans Model
 Debug = False
-gAcc = 0. #9.806
+gAcc = 0 #9.806
 
 
 class Craft:
@@ -77,11 +77,24 @@ class Craft:
         self.IntegPos_y     = Daseon.Integrator(self.pos.y, dt)
         self.IntegPos_z     = Daseon.Integrator(self.pos.z, dt)
 
-    def simulate(self, pqrD):
-        self.AngRateB.x     = self.ControllerActX.step(pqrD.x)
-        self.AngRateB.y     = self.ControllerActY.step(pqrD.y)
-        self.AngRateB.z     = self.ControllerActZ.step(pqrD.z)
-        self.datt           = self.Cnb.angRateTransformation(self.AngRateB, self.att)
+    def simulate(self, cmd, cmdtype='pqrD'):
+        if cmdtype=='pqrD':
+            pqrD    = cmd
+            self.AngRateB.x     = self.ControllerActX.step(pqrD.x)
+            self.AngRateB.y     = self.ControllerActY.step(pqrD.y)
+            self.AngRateB.z     = self.ControllerActZ.step(pqrD.z)
+            self.datt           = self.Cnb.angRateTransformation(self.AngRateB, self.att)
+        elif cmdtype=='acc':
+            acc     = cmd
+            if self.scavel <= 0.0001:
+                dpsiM       = 0
+                dtheM       = 0
+            else:
+                dpsiM       = acc.y/(self.scavel*m.cos(self.att.y))
+                dtheM       = -(acc.z+gAcc*m.cos(self.att.y))/self.scavel
+            self.datt.x = 0
+            self.datt.y = dtheM
+            self.datt.z = dpsiM
 
         self.att.x          = self.IntegAtt_x.step(self.datt.x)
         self.att.y          = self.IntegAtt_y.step(self.datt.y)

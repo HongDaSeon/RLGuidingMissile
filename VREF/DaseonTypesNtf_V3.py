@@ -83,7 +83,7 @@ class ASCIIart:
 
 class Vector3:
 
-    def __init__(self,x,y,z):
+    def __init__(self,x,y,z=0):
         self.x = x
         self.y = y
         self.z = z
@@ -92,7 +92,7 @@ class Vector3:
         return Vector3(lllist[0], lllist[1], lllist[2])
 
     def __repr__(self):
-        return str(self.vec)
+        return 'Vec3'+str(self.vec)
 
     def __add__(self, other):
         A = self.vec
@@ -359,10 +359,15 @@ class lineEQN:
             result = np.array([[9999999.], [9999999.]])
         return Vector3(result[0,0], result[1,0], 0)
 
-    def Is_inMyRange(self, intersec):
+    def Is_inMyRange(self, you, intersec):
         pntSml      = Vector3(min(self.pnt1.x, self.pnt2.x),min(self.pnt1.y, self.pnt2.y),0)
         pntLar      = Vector3(max(self.pnt1.x, self.pnt2.x),max(self.pnt1.y, self.pnt2.y),0)
         is_x_in     = ( (pntSml.x <= intersec.x) & (intersec.x <= pntLar.x) )
         is_y_in     = ( (pntSml.y <= intersec.y) & (intersec.y <= pntLar.y) )
+        if (is_x_in & is_y_in):
+            pntSml      = Vector3(min(you.pnt1.x, you.pnt2.x),min(you.pnt1.y, you.pnt2.y),0)
+            pntLar      = Vector3(max(you.pnt1.x, you.pnt2.x),max(you.pnt1.y, you.pnt2.y),0)
+            is_x_in     = ( (pntSml.x <= intersec.x) & (intersec.x <= pntLar.x) )
+            is_y_in     = ( (pntSml.y <= intersec.y) & (intersec.y <= pntLar.y) )
         return is_x_in & is_y_in
 
