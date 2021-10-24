@@ -42,7 +42,7 @@ def LearningSequence_1():
     cmdScale        = 30
 
     ######### Hyperparameters #########
-    env_name = "Vref"
+    env_name = "V2"
     log_interval = 10           # print avg reward after interval
     random_seed = 0
     gamma = 0.9999              # discount for future rewards
@@ -50,7 +50,7 @@ def LearningSequence_1():
     alr = 0.0001
     clr1 = 0.0001
     clr2 = 0.0001
-    exploration_noise = 0.1 
+    exploration_noise = 0.8 
     polyak = 0.995              # target policy update parameter (1-tau)
     policy_noise = 0.2          # target policy smoothing noise
     noise_clip = 0.5
@@ -129,7 +129,7 @@ def LearningSequence_1():
             log_f.close()
             #break
         
-        if (episode%100)==0:
+        if (episode%50)==0:
             policy.save(directory, filename_header+str(episode))
         
         # print avg reward every log interval:

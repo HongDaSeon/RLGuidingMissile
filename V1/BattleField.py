@@ -57,7 +57,9 @@ class BATTLEFIELD:
         randomTitleHolder   = Daseon.randomTitle()
         self.Title          = randomTitleHolder.title
         self.VisualInterface = None
-        print(self.Title)
+        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        print('++++++++++++++++++'+ self.Title +'+++++++++++++++++')
+        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
 
     def __repr__(self):
         dtstring            = 'dt '+ "{:.2f}".format(self.dt) 
@@ -135,10 +137,11 @@ class BATTLEFIELD:
     def referee(self, M_cmd, timeOut):
         Rng         = self.MissileSeeker.Rvec.mag
         engy        = M_cmd.y**2 * self.dt
+        Vrel        = self.MissileSeeker.Vrel
         isCollide   = False
         for stts in self.Structs:
-            isCollide = ( isCollide | stts.checkOverrap(self.Missile) )
-        rwdStreaming = -engy/2500
+            isCollide = ( isCollide | stts.checkOverrap(self.Missile.pos) )
+        rwdStreaming = -engy/2500 - Vrel/300
         rwd4Result = 0
         done = False
         hit = (Rng <= 30)

@@ -57,7 +57,9 @@ class BATTLEFIELD:
         randomTitleHolder   = Daseon.randomTitle()
         self.Title          = randomTitleHolder.title
         self.VisualInterface = None
-        print(self.Title)
+        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        print('++++++++++++++++++'+ self.Title +'+++++++++++++++++')
+        print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
 
     def __repr__(self):
         dtstring            = 'dt '+ "{:.2f}".format(self.dt) 
@@ -135,15 +137,18 @@ class BATTLEFIELD:
     def referee(self, M_cmd, timeOut):
         Rng         = self.MissileSeeker.Rvec.mag
         engy        = M_cmd.y**2 * self.dt
+        Vrel        = self.MissileSeeker.Vrel
         isCollide   = False
         for stts in self.Structs:
-            isCollide = ( isCollide | stts.checkOverrap(self.Missile) )
-        rwdStreaming = -engy/2500
+            isCollide = ( isCollide | stts.checkOverrap(self.Missile.pos) )
+        rwdStreaming = -engy/2500 - Vrel/200
         rwd4Result = 0
         done = False
-        hit = (Rng <= 30)
+        
         farAway = (self.Missile.pos.mag > self.TargetMaxDist*1.2)
-
+        ViewOut = abs(self.MissileSeeker.Look.z)>(50/180*m.pi)
+        Rng = self.getDist(ViewOut)
+        hit = (Rng <= 50)
         if isCollide:
             rwd4Result = -100 + 300/Rng
             done = True
@@ -152,6 +157,9 @@ class BATTLEFIELD:
             done = True
         if timeOut:
             rwd4Result = -150 + 300/Rng
+            done = True
+        if ViewOut:
+            rwd4Result = -100 + 200/Rng
             done = True
         if hit:
             rwd4Result = 200 + 300/Rng
@@ -173,78 +181,30 @@ class BATTLEFIELD:
         self.VisualInterface.draw_Spot(self.Target, (200,50,100), 5)
         self.VisualInterface.update()
 
-
-dt              = 0.1
-TMinDist        = 5000
-TMaxDist        = 10000
-MViewMax        = 100
-MSpd            = 280
-MaxNofly        = 5
-MaxStruct       = 30
-NoflySizeRng    = (500,3000)
-structSizeRng   = (50,400)
-timeScale       = 0
-cmdScale        = 30
-
-def O3to2(vec3):
-    return [vec3.x, vec3.y]
-
-def Test(dt, timeScale, cmdScale):
-    
-    test_Battlefield = BATTLEFIELD(dt, TMaxDist, TMinDist, MViewMax,\
-                                (200,400), MaxNofly, MaxStruct, NoflySizeRng, structSizeRng)#이거말고 리셋설정
-    VisualInterface = VisualizationPygame((800,800), 1/30, joy=True)                            
-    def visLoop():
-        Exit                = False
-        prevstepEndtime     = 0
-        t                   = 0
-        while not Exit:
-            loopStartTime   = time.time()
-            while time.time() <= (prevstepEndtime+(dt*timeScale)):
-                pass
-            M_rotRatey  = 0
-            M_rotRatey  = VisualInterface.controller.get_axis(3)*cmdScale
-            McmdVec     = Vector3(0, M_rotRatey, 0)
-            zeroVec     = Vector3(0,0,0)
-            test_Battlefield.step(McmdVec, t, False)
-            #print(test_Battlefield.Missile.pos)
-            VisualInterface.event_get()
-            # 시각화
-            #gameDisplay.scroll(int(controller.get_axis(1)*10), int(controller.get_axis(2)*10))
-            visStartTime = time.time()
-            VisualInterface.wipeOut()
-
-            VisualInterface.draw_NFZ(test_Battlefield)
-            VisualInterface.draw_STT(test_Battlefield)
-            VisualInterface.draw_Spot(test_Battlefield.Missile, (50,100,200), 5)
-
-            #print(test_Battlefield.LidarInfo)
-            VisualInterface.draw_lidar(test_Battlefield.Missile, test_Battlefield)
+    def getDist(self, OOR):
+        if OOR:
+            Rf_1 = self.MissileSeeker.prev_Rm
+            Rf = self.MissileSeeker.Yo.pos
             
-            VisualInterface.draw_Spot(test_Battlefield.Target, (200,50,100), 5)
-            VisualInterface.update()
+            R3 = Rf - Rf_1
+            A = R3
+            B = (self.MissileSeeker.Tu.pos - Rf_1) - R3
+            
+            if self.MissileSeeker.Rvec.mag < 50:
 
-            print('visdur : ' + str(time.time()- visStartTime))
-            t = t+dt
-            prevstepEndtime = time.time()
-            if VisualInterface.controller.get_axis(5)>=0.5:
-                test_Battlefield.reset(MSpd, MaxNofly, MaxStruct, NoflySizeRng, structSizeRng)
-                print("RESET")
-                visLoop()
-            print('loop dur : ', str(time.time()-loopStartTime))
+                self.MissileSeeker.impactR = (Vector3.cast(np.cross(A.vec,B.vec)).mag) / A.mag 
 
-    while True:
-        for event in pygame.event.get():
-            if VisualInterface.controller.get_axis(5)>=0.5:
-                test_Battlefield.reset(MSpd, MaxNofly, MaxStruct, NoflySizeRng, structSizeRng)
-                print("RESET")
-                visLoop()
+            else:
+                self.MissileSeeker.impactR = self.MissileSeeker.Rvec.mag
+
+            rwdR = copy.deepcopy(self.MissileSeeker.impactR)
+        else:
+            self.MissileSeeker.prev_Rm = copy.deepcopy(self.MissileSeeker.Yo.pos)
+            rwdR = copy.deepcopy(self.MissileSeeker.Rvec.mag)
+
+        return rwdR
 
 
-if __name__ == "__main__":
-    
-    Test(dt, timeScale, cmdScale)
-    pygame.joystick.quit()
 
 
 

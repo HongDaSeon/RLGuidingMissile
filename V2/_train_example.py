@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#-*- coding: utf-8 -*-
 import torch
 import gym
 import numpy as np
