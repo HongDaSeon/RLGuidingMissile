@@ -180,7 +180,7 @@ class Seeker:
             return (LOSdotval)*10
         
         def normVm(Vval):
-            return Vval/600
+            return (Vval-300)/100
 
         def normLk(Vval):
             return Vval/1.57
@@ -210,9 +210,10 @@ class Seeker:
         self.dLOS = Ldotb
         self.Yo.reset_flag = False
         Vvecb = self.Yo.Cnb.rotate(Vector3.cast(self.Vvec.vec), 'inv')
-        return self.Rvec.mag, self.Look, self.dLOS, self.Yo.scavel,\
+        '''return self.Rvec.mag, self.Look, self.dLOS, self.Yo.scavel,\
                                                     np.array([  normLk(self.ppLook.y), normLk(self.pLook.y), normLk(self.Look.y),\
-                                                                normLk(self.ppLook.z), normLk(self.pLook.z), normLk(self.Look.z)])
+                                                                normLk(self.ppLook.z), normLk(self.pLook.z), normLk(self.Look.z)])'''
+        return np.array([normLd(Ldotb.z), normVm(self.Yo.scavel)])
                                                                                 
     def newStepStarts(self, t):
         if t != 0:

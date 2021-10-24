@@ -24,10 +24,10 @@ class LidarModule:
 
     def StepNSense(self, BeamStartPos, OverralOrient, battlefield):
         #print(OverralOrient/m.pi*180)
-        OverralRatator  = DCM5DOF(Vector3(0,0,OverralOrient))
+        OverralRotator  = DCM5DOF(Vector3(0,0,OverralOrient))
         lidarInfo       = []
         for beamCNT in range(self.beamQuant):
-            tipCoord    = OverralRatator.rotate(self.beamTips[beamCNT]) + BeamStartPos
+            tipCoord    = OverralRotator.rotate(self.beamTips[beamCNT]) + BeamStartPos
             rootCoord   = BeamStartPos
             thisBeam    = lineEQN(rootCoord, tipCoord)
             intersecS   = [thisBeam.pnt2+battlefield.Missile.pos]

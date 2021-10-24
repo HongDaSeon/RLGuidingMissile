@@ -3,19 +3,23 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
-        
-        self.l1 = nn.Linear(state_dim, 300)
-        self.l2 = nn.Linear(300, 400)
-        self.l3 = nn.Linear(400, 300)
-        self.l4 = nn.Linear(300, 600)
-        self.l5 = nn.Linear(600, 400)
-        self.l6 = nn.Linear(400, 200)
-        self.l7 = nn.Linear(200, action_dim)
+        sd      = state_dim
+        #self.l1 = nn.Linear(sd, sd*1.5)
+        self.l1 = nn.Linear(int(sd), int(sd*1.5))
+        self.l2 = nn.Linear(int(sd*1.5), int(sd*2))
+        self.l3 = nn.Linear(sd*2, sd*4)
+        self.l4 = nn.Linear(sd*4, sd*4)
+        self.l5 = nn.Linear(sd*4, sd*4)
+        self.l6 = nn.Linear(sd*4, sd*4)
+        self.l7 = nn.Linear(sd*4, sd*2)
+        self.l8 = nn.Linear(sd*2, sd*1)
+        self.l9 = nn.Linear(sd*1, sd*1)
+        self.lA = nn.Linear(sd*1, action_dim)
         
         self.max_action = max_action
         
@@ -24,8 +28,11 @@ class Actor(nn.Module):
         torch.nn.init.xavier_uniform_(self.l3.weight)  
         torch.nn.init.xavier_uniform_(self.l4.weight)  
         torch.nn.init.xavier_uniform_(self.l5.weight)  
-        torch.nn.init.xavier_uniform_(self.l6.weight)  
-        torch.nn.init.xavier_uniform_(self.l7.weight)
+        torch.nn.init.xavier_uniform_(self.l6.weight)
+        torch.nn.init.xavier_uniform_(self.l7.weight) 
+        torch.nn.init.xavier_uniform_(self.l8.weight) 
+        torch.nn.init.xavier_uniform_(self.l9.weight)   
+        torch.nn.init.xavier_uniform_(self.lA.weight)
 
     def forward(self, state):
         x = F.relu(self.l1(state))
@@ -34,31 +41,40 @@ class Actor(nn.Module):
         x = F.tanh(self.l4(x))
         x = F.relu(self.l5(x))
         x = F.tanh(self.l6(x))
-        x = torch.tanh(self.l7(x)) * self.max_action
+        x = F.tanh(self.l7(x))
+        x = F.tanh(self.l8(x))
+        x = F.tanh(self.l9(x))
+        x = torch.tanh(self.lA(x)) * self.max_action
         return x
         
 class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
         super(Critic, self).__init__()
-        
-        self.l1 = nn.Linear(state_dim + action_dim, 300)
-        self.l2 = nn.Linear(300, 400)
-        self.l3 = nn.Linear(400, 300)
-        self.l4 = nn.Linear(300, 600)
-        self.l5 = nn.Linear(600, 400)
-        self.l6 = nn.Linear(400, 200)
-        self.l7 = nn.Linear(200, 1)
+        cd      = state_dim + action_dim
+        self.l1 = nn.Linear(cd, int(cd*1.5))
+        self.l2 = nn.Linear(int(cd*1.5), cd*2)
+        self.l3 = nn.Linear(cd*2, cd*5)
+        self.l4 = nn.Linear(cd*5, cd*5)
+        self.l5 = nn.Linear(cd*5, cd*5)
+        self.l6 = nn.Linear(cd*5, cd*5)
+        self.l7 = nn.Linear(cd*5, cd*5)
+        self.l8 = nn.Linear(cd*5, cd*3)
+        self.l9 = nn.Linear(cd*3, cd)
+        self.lA = nn.Linear(cd, 1)
 
         torch.nn.init.xavier_uniform_(self.l1.weight)
         torch.nn.init.xavier_uniform_(self.l2.weight)   
         torch.nn.init.xavier_uniform_(self.l3.weight)  
         torch.nn.init.xavier_uniform_(self.l4.weight)  
-        torch.nn.init.xavier_uniform_(self.l5.weight)  
-        torch.nn.init.xavier_uniform_(self.l6.weight)  
-        torch.nn.init.xavier_uniform_(self.l7.weight)  
+        torch.nn.init.xavier_uniform_(self.l5.weight)
+        torch.nn.init.xavier_uniform_(self.l6.weight)
+        torch.nn.init.xavier_uniform_(self.l7.weight)
+        torch.nn.init.xavier_uniform_(self.l8.weight)  
+        torch.nn.init.xavier_uniform_(self.l9.weight)  
+        torch.nn.init.xavier_uniform_(self.lA.weight)  
         
     def forward(self, state, action):
-        state_action = torch.cat([state, action], 1)
+        state_action = torch.cat([state, action/99], 1)
         
         q = F.relu(self.l1(state_action))
         q = F.tanh(self.l2(q))
@@ -66,31 +82,36 @@ class Critic(nn.Module):
         q = F.tanh(self.l4(q))
         q = F.relu(self.l5(q))
         q = F.tanh(self.l6(q))
-        q = self.l7(q)
+        q = F.relu(self.l7(q))
+        q = F.relu(self.l8(q))
+        q = F.relu(self.l9(q))
+        q = self.lA(q)
         return q
     
 class TD3:
-    def __init__(self, alr, c1lr, c2lr, state_dim, action_dim, max_action):
+    def __init__(self, alr, c1lr, c2lr, state_dim, action_dim, max_action, gpu_num):
         
-        self.actor = Actor(state_dim, action_dim, max_action).to(device)
-        self.actor_target = Actor(state_dim, action_dim, max_action).to(device)
+        self.device = torch.device("cuda:"+str(gpu_num) if torch.cuda.is_available() else "cpu")
+
+        self.actor = Actor(state_dim, action_dim, max_action).to(self.device)
+        self.actor_target = Actor(state_dim, action_dim, max_action).to(self.device)
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=alr)
         
-        self.critic_1 = Critic(state_dim, action_dim).to(device)
-        self.critic_1_target = Critic(state_dim, action_dim).to(device)
+        self.critic_1 = Critic(state_dim, action_dim).to(self.device)
+        self.critic_1_target = Critic(state_dim, action_dim).to(self.device)
         self.critic_1_target.load_state_dict(self.critic_1.state_dict())
         self.critic_1_optimizer = optim.Adam(self.critic_1.parameters(), lr=c1lr)
         
-        self.critic_2 = Critic(state_dim, action_dim).to(device)
-        self.critic_2_target = Critic(state_dim, action_dim).to(device)
+        self.critic_2 = Critic(state_dim, action_dim).to(self.device)
+        self.critic_2_target = Critic(state_dim, action_dim).to(self.device)
         self.critic_2_target.load_state_dict(self.critic_2.state_dict())
         self.critic_2_optimizer = optim.Adam(self.critic_2.parameters(), lr=c2lr)
         
         self.max_action = max_action
     
     def select_action(self, state):
-        state = torch.FloatTensor(state.reshape(1, -1)).to(device)
+        state = torch.FloatTensor(state.reshape(1, -1)).to(self.device)
         return self.actor(state).cpu().data.numpy().flatten()
     
     def update(self, replay_buffer, n_iter, batch_size, gamma, polyak, policy_noise, noise_clip, policy_delay):
@@ -98,14 +119,14 @@ class TD3:
         for i in range(n_iter):
             # Sample a batch of transitions from replay buffer:
             state, action_, reward, next_state, done = replay_buffer.sample(batch_size)
-            state = torch.FloatTensor(state).to(device)
-            action = torch.FloatTensor(action_).to(device)
-            reward = torch.FloatTensor(reward).reshape((batch_size,1)).to(device)
-            next_state = torch.FloatTensor(next_state).to(device)
-            done = torch.FloatTensor(done).reshape((batch_size,1)).to(device)
+            state = torch.FloatTensor(state).to(self.device)
+            action = torch.FloatTensor(action_).to(self.device)
+            reward = torch.FloatTensor(reward).reshape((batch_size,1)).to(self.device)
+            next_state = torch.FloatTensor(next_state).to(self.device)
+            done = torch.FloatTensor(done).reshape((batch_size,1)).to(self.device)
             
             # Select next action according to target policy:
-            noise = torch.FloatTensor(action_).data.normal_(0, policy_noise).to(device)
+            noise = torch.FloatTensor(action_).data.normal_(0, policy_noise).to(self.device)
             noise = noise.clamp(-noise_clip, noise_clip)
             next_action = (self.actor_target(next_state) + noise)
             next_action = next_action.clamp(-self.max_action, self.max_action)

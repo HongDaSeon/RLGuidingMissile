@@ -66,6 +66,10 @@ class STT:
             Dists       = [9999999]
         return Intersecs[MinArg], Dists[MinArg]
 
+    def checkOverrap(self, theObject):
+        vts = self.vertices
+        return isInside(theObject.pos, vts[0],vts[1],vts[2],vts[3], self.areaREF)
+
 def getVertices(centerpos, dimension, orientation):
     RotationMat         = DCM5DOF( Vector3(0,0,orientation) )
     vtx0                = centerpos + RotationMat.rotate(Vector3( dimension[0]/2,  dimension[1]/2, 0),'inv')

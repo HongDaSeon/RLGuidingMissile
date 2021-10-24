@@ -28,10 +28,11 @@ import copy
 import math as m
 import pygame
 import sys
+from GameVisual import VisualizationPygame
 
 class BATTLEFIELD:
 
-    def __init__(self, dt, TargetMaxDist, TargetMinDist, MissileViewMax, MissileSpd,\
+    def __init__(self, dt, TargetMaxDist, TargetMinDist, MissileViewMax, MissileSpdRNG,\
                                                             MaxNofly, MaxStruct, NoflySizeRng, structSizeRng):
         self.dt             = dt
         self.TargetMaxDist  = TargetMaxDist
@@ -41,15 +42,20 @@ class BATTLEFIELD:
         self.NoflySizeRng   = NoflySizeRng
         self.structSizeRng  = structSizeRng
         self.fovMaxMissile  = MissileViewMax/180*m.pi
-        self.Vm             = MissileSpd
+        self.MissileSpdRNG  = MissileSpdRNG
         
         self.NoFlyZones     = []
         self.Structs        = []
         self.TargetInitPos  = Vector3(0.,0.,0.)
+        self.Vm             = 0
         self.Target         = None
         self.Missile        = None
         self.Lidar          = None
         self.LidarInfo      = []
+        self.init_picker()
+        self.MissileSeeker  = CraftDynamics.Seeker(self.Missile, self.Target)
+
+        self.VisualInterface = None
 
     def __repr__(self):
         dtstring            = 'dt '+ "{:.2f}".format(self.dt) 
@@ -66,6 +72,7 @@ class BATTLEFIELD:
         self.Target             = CraftDynamics.Craft(0, self.TargetInitPos, Vector3(0,0,0), self.dt)
 
         MissileHead             = TargetDirec + (rd.random()-0.5)*self.fovMaxMissile
+        self.Vm                 = 200 + rd.random()*200
         self.Missile            = CraftDynamics.Craft(self.Vm, Vector3(0,0,0), Vector3(0,0,MissileHead), self.dt)
 
         NoflyQuant          = rd.randrange(0,self.MaxNofly)
@@ -82,17 +89,27 @@ class BATTLEFIELD:
         VecMinimum       = Vector3.cast(Rvec.vec + t_minimum * Vvec.vec)
         return VecMinimum.mag
 
-    def step(self, M_cmd, t, forcedQuit):
+    def step(self, M_cmd, t, timeOut):
         #print(M_cmd)
         self.Missile.simulate(M_cmd, cmdtype='acc')
         self.LidarInfo   = self.Lidar.StepNSense(self.Missile.pos, self.Missile.att.z, self)
+        seekerdat   = self.MissileSeeker.seek(t)
+        lidardat    = np.array(self.LidarInfo)
+        lidardat    = np.array(lidardat[:,0], dtype=float)
+        normlidardat = (lidardat - 5000)/5000
+        normlidardat = normlidardat.clip(-1,1)
+        #print(np.concatenate([seekerdat, normlidardat], axis = 0))
+        RWD, done   = self.referee(M_cmd, timeOut)
+        
+        return np.concatenate([seekerdat, lidardat], axis = 0), RWD, done
+
     
-    def reset(self, MissileSpd, MaxNofly, MaxStruct, NoflySizeRng, structSizeRng):
+    def reset(self, MissileSpdRNG, MaxNofly, MaxStruct, NoflySizeRng, structSizeRng):
         self.MaxNofly       = MaxNofly
         self.MaxStruct      = MaxStruct
         self.NoflySizeRng   = NoflySizeRng
         self.structSizeRng  = structSizeRng
-        self.Vm             = MissileSpd
+        self.MissileSpdRNG  = MissileSpdRNG
         
         self.NoFlyZones     = []
         self.Structs        = []
@@ -100,10 +117,62 @@ class BATTLEFIELD:
         self.Target         = None
         self.Missile        = None
         self.Lidar          = None
-        self.LidarInfo      = []
+        
         self.init_picker()
+        self.MissileSeeker  = CraftDynamics.Seeker(self.Missile, self.Target)
+        self.LidarInfo      = self.Lidar.StepNSense(self.Missile.pos, self.Missile.att.z, self)
 
-dt              = 0.01
+        seekerdat = self.MissileSeeker.seek(0)
+        lidardat = np.array(self.LidarInfo)
+        lidardat = np.array(lidardat[:,0], dtype=float)
+        normlidardat = (lidardat - 5000)/5000
+        normlidardat = normlidardat.clip(-1,1)
+        #print(np.concatenate([seekerdat, normlidardat], axis = 0))
+        return np.concatenate([seekerdat, normlidardat], axis = 0)
+
+    def referee(self, M_cmd, timeOut):
+        Rng         = self.MissileSeeker.Rvec.mag
+        engy        = M_cmd.y**2 * self.dt
+        isCollide   = False
+        for stts in self.Structs:
+            isCollide = ( isCollide | stts.checkOverrap(self.Missile) )
+        rwdStreaming = -engy/2500
+        rwd4Result = 0
+        done = False
+        hit = (Rng <= 30)
+        farAway = (self.Missile.pos.mag > self.TargetMaxDist*1.2)
+
+        if isCollide:
+            rwd4Result = -100 + 300/Rng
+            done = True
+        if farAway:
+            rwd4Result = -150 + 300/Rng
+            done = True
+        if timeOut:
+            rwd4Result = -150 + 300/Rng
+            done = True
+        if hit:
+            rwd4Result = 200 + 300/Rng
+            done = True
+        RWD = rwdStreaming + rwd4Result
+        return RWD, done
+
+    def render(self, dt, mode='run'):
+        if(mode == 'Initialization'):
+            self.VisualInterface = VisualizationPygame((800,800), 1/30, joy=False)
+            Exit                = False
+        
+        self.VisualInterface.wipeOut()
+        self.VisualInterface.draw_NFZ(self)
+        self.VisualInterface.draw_STT(self)
+        self.VisualInterface.draw_Spot(self.Missile, (50,100,200), 5)
+
+        self.VisualInterface.draw_lidar(self.Missile, self)
+        self.VisualInterface.draw_Spot(self.Target, (200,50,100), 5)
+        self.VisualInterface.update()
+
+
+dt              = 0.1
 TMinDist        = 5000
 TMaxDist        = 10000
 MViewMax        = 100
@@ -111,8 +180,8 @@ MSpd            = 280
 MaxNofly        = 5
 MaxStruct       = 30
 NoflySizeRng    = (500,3000)
-structSizeRng   = (50,200)
-timeScale       = 1
+structSizeRng   = (50,400)
+timeScale       = 0
 cmdScale        = 30
 
 def O3to2(vec3):
@@ -121,100 +190,54 @@ def O3to2(vec3):
 def Test(dt, timeScale, cmdScale):
     
     test_Battlefield = BATTLEFIELD(dt, TMaxDist, TMinDist, MViewMax,\
-                                MSpd, MaxNofly, MaxStruct, NoflySizeRng, structSizeRng)#이거말고 리셋설정
-    pygame.init()
-    pygame.joystick.init()
-
-    try:
-        controller = pygame.joystick.Joystick(0)
-        controller.init()
-        print ("Joystick_Paired: {0}".format(controller.get_name()))
-    except pygame.error:
-        print ("None of or Invalid joystick connected")
-
-    display_width = 800
-    display_height = 800
-    gameDisplay = pygame.display.set_mode((display_width, display_height))
-    pygame.display.set_caption('Environment Test Environment')
-    C_Missile       = (50, 100, 200)
-    C_NoflyZone     = (200, 100, 200)
-    C_lidarSens     = (150, 150, 200)
-    C_Target        = (200, 50, 100)
-    C_lGrey         = (200, 200, 200)
-    centre          = (display_width/2, display_height/2)
-    
-    Lookscale       = 1/30
-    def in2Dcenter(d2list):
-        
-        return [d2list[0]*Lookscale+display_width/2, d2list[1]*Lookscale+display_height/2 ]
-
+                                (200,400), MaxNofly, MaxStruct, NoflySizeRng, structSizeRng)#이거말고 리셋설정
+    VisualInterface = VisualizationPygame((800,800), 1/30, joy=True)                            
     def visLoop():
         Exit                = False
-        H_spotx             = display_width/2
-        H_spoty             = display_height/2
         prevstepEndtime     = 0
         t                   = 0
-        shift_x             = 0
-        shift_y             = 0
         while not Exit:
+            loopStartTime   = time.time()
             while time.time() <= (prevstepEndtime+(dt*timeScale)):
                 pass
-            M_rotRatex  = 0
             M_rotRatey  = 0
-            M_rotRatex  = controller.get_axis(3)*cmdScale
-            M_rotRatey  = controller.get_axis(3)*cmdScale
-            shift_x     = shift_x + controller.get_axis(1)
-            shift_y     = shift_y + controller.get_axis(2)
-            #print(controller.get_axis(1))
-            #print(controller.get_axis(2))
-            #print(controller.get_axis(3))
-            #print(controller.get_axis(4))
-
+            M_rotRatey  = VisualInterface.controller.get_axis(3)*cmdScale
             McmdVec     = Vector3(0, M_rotRatey, 0)
             zeroVec     = Vector3(0,0,0)
             test_Battlefield.step(McmdVec, t, False)
             #print(test_Battlefield.Missile.pos)
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    print('goodbye')
-                    sys.exit()
-                if event.type == pygame.JOYAXISMOTION:  # Joystick
-                    pass
-                if event.type == pygame.JOYBUTTONDOWN:  
-                    print("Joystick Button pressed")
+            VisualInterface.event_get()
             # 시각화
             #gameDisplay.scroll(int(controller.get_axis(1)*10), int(controller.get_axis(2)*10))
-            
-            pygame.draw.rect(gameDisplay, (0,0,0), [0, 0 , display_width, display_height])
+            visStartTime = time.time()
+            VisualInterface.wipeOut()
 
-            for nfzs in test_Battlefield.NoFlyZones:
-                pygame.draw.circle(gameDisplay, C_NoflyZone, in2Dcenter(O3to2(nfzs.pos)), nfzs.radius*Lookscale)
-            for stts in test_Battlefield.Structs:
-                pygame.draw.polygon(gameDisplay, C_lGrey, [ in2Dcenter(stts.d2vertices[0]),\
-                                                            in2Dcenter(stts.d2vertices[1]),\
-                                                            in2Dcenter(stts.d2vertices[2]),
-                                                            in2Dcenter(stts.d2vertices[3])], 2)
-            M2Dpos = O3to2(test_Battlefield.Missile.pos)
-            pygame.draw.circle(gameDisplay, C_Missile, in2Dcenter(M2Dpos), 5)
+            VisualInterface.draw_NFZ(test_Battlefield)
+            VisualInterface.draw_STT(test_Battlefield)
+            VisualInterface.draw_Spot(test_Battlefield.Missile, (50,100,200), 5)
+
             #print(test_Battlefield.LidarInfo)
-            for lidars in test_Battlefield.LidarInfo:
-                pygame.draw.aaline(gameDisplay, C_lidarSens, in2Dcenter(M2Dpos), in2Dcenter(O3to2(lidars[1])), 1)
-            pygame.draw.circle(gameDisplay, C_Target, in2Dcenter(O3to2(test_Battlefield.Target.pos)),5)
-            pygame.display.update()
+            VisualInterface.draw_lidar(test_Battlefield.Missile, test_Battlefield)
+            
+            VisualInterface.draw_Spot(test_Battlefield.Target, (200,50,100), 5)
+            VisualInterface.update()
 
+            print('visdur : ' + str(time.time()- visStartTime))
             t = t+dt
             prevstepEndtime = time.time()
-            if controller.get_axis(5)>=0.5:
+            if VisualInterface.controller.get_axis(5)>=0.5:
                 test_Battlefield.reset(MSpd, MaxNofly, MaxStruct, NoflySizeRng, structSizeRng)
                 print("RESET")
                 visLoop()
+            print('loop dur : ', str(time.time()-loopStartTime))
 
     while True:
         for event in pygame.event.get():
-            if controller.get_axis(5)>=0.5:
+            if VisualInterface.controller.get_axis(5)>=0.5:
                 test_Battlefield.reset(MSpd, MaxNofly, MaxStruct, NoflySizeRng, structSizeRng)
                 print("RESET")
                 visLoop()
+
 
 if __name__ == "__main__":
     
